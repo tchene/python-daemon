@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 ***
 Modified generic daemon class
@@ -27,6 +28,7 @@ import os
 import sys
 import time
 import signal
+import pwd
 
 
 class Daemon(object):
@@ -35,6 +37,7 @@ class Daemon(object):
 
     Usage: subclass the Daemon class and override the run() method
     """
+
     def __init__(self, pidfile, stdin=os.devnull,
                  stdout=os.devnull, stderr=os.devnull,
                  home_dir='.', umask=022, verbose=1, use_gevent=False):
@@ -115,6 +118,21 @@ class Daemon(object):
             self.delpid)  # Make sure pid file is removed if we quit
         pid = str(os.getpid())
         file(self.pidfile, 'w+').write("%s\n" % pid)
+
+        # If daemon user is set change current user to self.daemon_user
+        if self.daemon_user:
+            try:
+                uid = pwd.getpwnam(self.daemon_user)[2]
+                print self.daemon_user
+                print uid
+                os.setuid(uid)
+            except NameError, e:
+                print "NameError %s" % e
+                return 4
+            except OSError, e:
+                print "OSError %s" % e
+                return 4
+        return 0
 
     def delpid(self):
         os.remove(self.pidfile)
@@ -218,6 +236,12 @@ class Daemon(object):
             print 'Process (pid %d) is killed' % pid
 
         return pid and os.path.exists('/proc/%d' % pid)
+
+    def change_user(self, username):
+        ''' Set user under which the daemonized process should be run '''
+        if not isinstance(username, (str, unicode)):
+            raise TypeError('username should be of type str or unicode')
+        self.daemon_user = username
 
     def run(self):
         """
